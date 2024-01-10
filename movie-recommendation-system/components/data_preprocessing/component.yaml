@@ -1,0 +1,75 @@
+name: Data processing
+inputs:
+- {name: input_df, type: PKL}
+outputs:
+- {name: df, type: PKL}
+implementation:
+  container:
+    image: python:3.10
+    command:
+    - sh
+    - -c
+    - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+      'joblib' 'cloudpickle' 'pandas' 'kfp==1.8.22' || PIP_DISABLE_PIP_VERSION_CHECK=1
+      python3 -m pip install --quiet --no-warn-script-location 'joblib' 'cloudpickle'
+      'pandas' 'kfp==1.8.22' --user) && "$0" "$@"
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp)
+      printf "%s" "$0" > "$program_path"
+      python3 -u "$program_path" "$@"
+    - |
+      def _make_parent_dirs_and_return_path(file_path: str):
+          import os
+          os.makedirs(os.path.dirname(file_path), exist_ok=True)
+          return file_path
+
+      import sys
+      try:
+          import cloudpickle as _cloudpickle
+      except ImportError:
+          import subprocess
+          try:
+              print("cloudpickle is not installed. Installing it globally", file=sys.stderr)
+              subprocess.run([sys.executable, "-m", "pip", "install", "cloudpickle==1.1.1", "--quiet"], env={"PIP_DISABLE_PIP_VERSION_CHECK": "1"}, check=True)
+              print("Installed cloudpickle globally", file=sys.stderr)
+          except:
+              print("Failed to install cloudpickle globally. Installing for the current user.", file=sys.stderr)
+              subprocess.run([sys.executable, "-m", "pip", "install", "cloudpickle==1.1.1", "--user", "--quiet"], env={"PIP_DISABLE_PIP_VERSION_CHECK": "1"}, check=True)
+              print("Installed cloudpickle for the current user", file=sys.stderr)
+              # Enable loading from user-installed package directory. Python does not add it to sys.path if it was empty at start. Running pip does not refresh `sys.path`.
+              import site
+              sys.path.append(site.getusersitepackages())
+          import cloudpickle as _cloudpickle
+          print("cloudpickle loaded successfully after installing.", file=sys.stderr)
+
+      pickler_python_version = (3, 10, 13, 'final', 0)
+      current_python_version = tuple(sys.version_info)
+      if (
+          current_python_version[0] != pickler_python_version[0] or
+          current_python_version[1] < pickler_python_version[1] or
+          current_python_version[0] == 3 and ((pickler_python_version[1] < 6) != (current_python_version[1] < 6))
+          ):
+          raise RuntimeError("Incompatible python versions: " + str(current_python_version) + " instead of " + str(pickler_python_version))
+
+      if current_python_version != pickler_python_version:
+          print("Warning!: Different python versions. The code may crash! Current environment python version: " + str(current_python_version) + ". Component code python version: " + str(pickler_python_version), file=sys.stderr)
+
+      import base64
+      import pickle
+
+      data_processing = pickle.loads(base64.b64decode(b'gASVCwYAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwJLAEsASwhLBEtDQ2RkAWQAbAB9AmQBZABsAX0DZAFkAGwCfQRkAWQAbAN9BXwCoARkAqEBfQZ0BWQDfAabAJ0CgwEBAHwFoAZ8AKEBfQd8B2oHdAhkBGQFjQJ8B2QGPAB8BaAJfAd8AaECAQBkAFMAlChOSwCMC0VOVklST05NRU5UlIwLUnVubmluZyBvbiCUSwGMBGF4aXOUhZSMBnN0cmluZ5R0lCiMAm9zlIwDc3lzlIwGcGFuZGFzlIwGam9ibGlilIwGZ2V0ZW52lIwFcHJpbnSUjARsb2FklIwFYXBwbHmUjB1nZW5yZXNfYW5kX2tleXdvcmRzX3RvX3N0cmluZ5SMBGR1bXCUdJQojAhpbnB1dF9kZpSMB2RmX3BhdGiUaA9oEIwCcGSUaBJoCYwCZGaUdJSMai9ob21lL21hbnBtL0RldmVsb3BlcnMvTUxFLUNvdXJzZS9tb3ZpZS1yZWNvbW1lbmRhdGlvbi1zeXN0ZW0vLi9jb21wb25lbnRzL2RhdGFfcHJlcHJvY2Vzc2luZy9jb21wb25lbnQucHmUjA9kYXRhX3Byb2Nlc3NpbmeUSwxDEBABCAEIAQoCDgEKAxICEAKUKSl0lFKUfZQojAtfX3BhY2thZ2VfX5ROjAhfX25hbWVfX5SMCF9fbWFpbl9flIwIX19maWxlX1+UaB91Tk5OdJRSlIwcY2xvdWRwaWNrbGUuY2xvdWRwaWNrbGVfZmFzdJSMEl9mdW5jdGlvbl9zZXRzdGF0ZZSTlGgqfZR9lChoJmggjAxfX3F1YWxuYW1lX1+UaCCMD19fYW5ub3RhdGlvbnNfX5R9lChoGowZa2ZwLmNvbXBvbmVudHMuX3B5dGhvbl9vcJSMCUlucHV0UGF0aJSTlCmBlH2UjAR0eXBllIwDUEtMlHNiaBtoM4wKT3V0cHV0UGF0aJSTlCmBlH2UaDhoOXNidYwOX19rd2RlZmF1bHRzX1+UTowMX19kZWZhdWx0c19flE6MCl9fbW9kdWxlX1+UaCeMB19fZG9jX1+UTowLX19jbG9zdXJlX1+UTowXX2Nsb3VkcGlja2xlX3N1Ym1vZHVsZXOUXZSMC19fZ2xvYmFsc19flH2UaBdoAihoByhLAUsASwBLA0sES0NDUHQAoAF8AGQBGQChAX0BZAKgAmQDZASEAHwBRACDAaEBfQF0AKABfABkBRkAoQF9AmQCoAJkBmQEhAB8AkQAgwGhAX0CZAd8AXwCZgIWAFMAlChOjAZnZW5yZXOUjAEglGgHKEsBSwBLAEsCSwVLc0MigQB8AF0MfQFkAKAAfAFkARkAoAGhAKEBVgABAHECZAJTAJSMAJSMBG5hbWWUToeUjARqb2lulIwFc3BsaXSUhpSMAi4wlIwBapSGlIxTL2hvbWUvbWFucG0vRGV2ZWxvcGVycy9NTEUtQ291cnNlL21vdmllLXJlY29tbWVuZGF0aW9uLXN5c3RlbS8uL3V0aWxzL2RhdGFfdXRpbHMucHmUjAk8Z2VuZXhwcj6USwVDBAKAIACUKSl0lFKUjDBnZW5yZXNfYW5kX2tleXdvcmRzX3RvX3N0cmluZy48bG9jYWxzPi48Z2VuZXhwcj6UjAhrZXl3b3Jkc5RoByhLAUsASwBLAksFS3NoSmhNaFBoU2hUaFVLCGhWKSl0lFKUjAUlcyAlc5R0lIwEanNvbpSMBWxvYWRzlGhOh5SMA3Jvd5RoSGhah5RoVGgXSwNDCg4BFAEOAhQBDAGUKSl0lFKUfZQoaCWMBXV0aWxzlGgmjBB1dGlscy5kYXRhX3V0aWxzlGgoaFR1Tk5OdJRSlGgtaGt9lH2UKGgmaBdoMGgXaDF9lGg+Tmg/TmhAaGloQU5oQk5oQ12UaEV9lGhfaACMCXN1YmltcG9ydJSTlGhfhZRSlHN1hpSGUjBzdYaUhlIwLg=='))
+
+      import argparse
+      _parser = argparse.ArgumentParser(prog='Data processing', description='')
+      _parser.add_argument("--input-df", dest="input_df", type=str, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--df", dest="df_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+      _parsed_args = vars(_parser.parse_args())
+
+      _outputs = data_processing(**_parsed_args)
+    args:
+    - --input-df
+    - {inputPath: input_df}
+    - --df
+    - {outputPath: df}

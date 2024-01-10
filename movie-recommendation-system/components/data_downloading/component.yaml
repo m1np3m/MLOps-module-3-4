@@ -1,0 +1,75 @@
+name: Data downloading
+inputs:
+- {name: url, type: String}
+outputs:
+- {name: data, type: PKL}
+implementation:
+  container:
+    image: python:3.10
+    command:
+    - sh
+    - -c
+    - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+      'joblib' 'cloudpickle' 'pandas' 'kfp==1.8.22' || PIP_DISABLE_PIP_VERSION_CHECK=1
+      python3 -m pip install --quiet --no-warn-script-location 'joblib' 'cloudpickle'
+      'pandas' 'kfp==1.8.22' --user) && "$0" "$@"
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp)
+      printf "%s" "$0" > "$program_path"
+      python3 -u "$program_path" "$@"
+    - |
+      def _make_parent_dirs_and_return_path(file_path: str):
+          import os
+          os.makedirs(os.path.dirname(file_path), exist_ok=True)
+          return file_path
+
+      import sys
+      try:
+          import cloudpickle as _cloudpickle
+      except ImportError:
+          import subprocess
+          try:
+              print("cloudpickle is not installed. Installing it globally", file=sys.stderr)
+              subprocess.run([sys.executable, "-m", "pip", "install", "cloudpickle==1.1.1", "--quiet"], env={"PIP_DISABLE_PIP_VERSION_CHECK": "1"}, check=True)
+              print("Installed cloudpickle globally", file=sys.stderr)
+          except:
+              print("Failed to install cloudpickle globally. Installing for the current user.", file=sys.stderr)
+              subprocess.run([sys.executable, "-m", "pip", "install", "cloudpickle==1.1.1", "--user", "--quiet"], env={"PIP_DISABLE_PIP_VERSION_CHECK": "1"}, check=True)
+              print("Installed cloudpickle for the current user", file=sys.stderr)
+              # Enable loading from user-installed package directory. Python does not add it to sys.path if it was empty at start. Running pip does not refresh `sys.path`.
+              import site
+              sys.path.append(site.getusersitepackages())
+          import cloudpickle as _cloudpickle
+          print("cloudpickle loaded successfully after installing.", file=sys.stderr)
+
+      pickler_python_version = (3, 10, 13, 'final', 0)
+      current_python_version = tuple(sys.version_info)
+      if (
+          current_python_version[0] != pickler_python_version[0] or
+          current_python_version[1] < pickler_python_version[1] or
+          current_python_version[0] == 3 and ((pickler_python_version[1] < 6) != (current_python_version[1] < 6))
+          ):
+          raise RuntimeError("Incompatible python versions: " + str(current_python_version) + " instead of " + str(pickler_python_version))
+
+      if current_python_version != pickler_python_version:
+          print("Warning!: Different python versions. The code may crash! Current environment python version: " + str(current_python_version) + ". Component code python version: " + str(pickler_python_version), file=sys.stderr)
+
+      import base64
+      import pickle
+
+      data_downloading = pickle.loads(base64.b64decode(b'gASVLQQAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwJLAEsASwhLBUtDQ2hkAWQAbAB9AmQBZABsAX0DZAFkAGwCfQRkAWQAbAN9BXwCoARkAqEBfQZ0BWQDfAabAJ0CgwEBAHwEoAZ0B6AIdAmhAaEBfQd0BWQEfAdqCpsAnQKDAQEAfAWgC3wHfAGhAgEAZABTAJQoTksAjAtFTlZJUk9OTUVOVJSMC1J1bm5pbmcgb24glIwiU3VjY2Vzc2Z1bGx5IGRvd25sb2FkIGRhdGEgc2hhcGU6IJR0lCiMAm9zlIwDc3lzlIwGcGFuZGFzlIwGam9ibGlilIwGZ2V0ZW52lIwFcHJpbnSUjAhyZWFkX2NzdpSMCERBVEFfVVJMlIwGZm9ybWF0lIwKTU9WSUVTX0NTVpSMBXNoYXBllIwEZHVtcJR0lCiMA3VybJSMCWRhdGFfcGF0aJRoDWgOjAJwZJRoEGgJjAJkZpR0lIxoL2hvbWUvbWFucG0vRGV2ZWxvcGVycy9NTEUtQ291cnNlL21vdmllLXJlY29tbWVuZGF0aW9uLXN5c3RlbS8uL2NvbXBvbmVudHMvZGF0YV9kb3dubG9hZGluZy9jb21wb25lbnQucHmUjBBkYXRhX2Rvd25sb2FkaW5nlEsLQxAQAQgBCAEKAg4BEAIQAhAClCkpdJRSlH2UKIwLX19wYWNrYWdlX1+UTowIX19uYW1lX1+UjAhfX21haW5fX5SMCF9fZmlsZV9flGgfdU5OTnSUUpSMHGNsb3VkcGlja2xlLmNsb3VkcGlja2xlX2Zhc3SUjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoKn2UfZQoaCZoIIwMX19xdWFsbmFtZV9flGggjA9fX2Fubm90YXRpb25zX1+UfZQoaBqMCGJ1aWx0aW5zlIwDc3RylJOUaBuMGWtmcC5jb21wb25lbnRzLl9weXRob25fb3CUjApPdXRwdXRQYXRolJOUKYGUfZSMBHR5cGWUjANQS0yUc2J1jA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoJ4wHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZQoaBSMWGh0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS9DVG9waGFtL1RvcGhhbVJlcG8vbWFzdGVyL01vdmllJTIwUHJvamVjdC9SZXNvdXJjZXMve32UaBaMFHRtZGJfNTAwMF9tb3ZpZXMuY3N2lHV1hpSGUjAu'))
+
+      import argparse
+      _parser = argparse.ArgumentParser(prog='Data downloading', description='')
+      _parser.add_argument("--url", dest="url", type=str, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--data", dest="data_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+      _parsed_args = vars(_parser.parse_args())
+
+      _outputs = data_downloading(**_parsed_args)
+    args:
+    - --url
+    - {inputValue: url}
+    - --data
+    - {outputPath: data}

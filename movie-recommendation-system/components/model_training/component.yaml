@@ -1,0 +1,80 @@
+name: Model training
+inputs:
+- {name: df, type: PKL}
+outputs:
+- {name: matrix, type: PKL}
+- {name: movie2idx, type: PKL}
+implementation:
+  container:
+    image: python:3.10
+    command:
+    - sh
+    - -c
+    - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+      'joblib' 'cloudpickle' 'pandas' 'kfp==1.8.22' 'scikit-learn==1.3.2' 'SciPy==1.11.4'
+      || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+      'joblib' 'cloudpickle' 'pandas' 'kfp==1.8.22' 'scikit-learn==1.3.2' 'SciPy==1.11.4'
+      --user) && "$0" "$@"
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp)
+      printf "%s" "$0" > "$program_path"
+      python3 -u "$program_path" "$@"
+    - |
+      def _make_parent_dirs_and_return_path(file_path: str):
+          import os
+          os.makedirs(os.path.dirname(file_path), exist_ok=True)
+          return file_path
+
+      import sys
+      try:
+          import cloudpickle as _cloudpickle
+      except ImportError:
+          import subprocess
+          try:
+              print("cloudpickle is not installed. Installing it globally", file=sys.stderr)
+              subprocess.run([sys.executable, "-m", "pip", "install", "cloudpickle==1.1.1", "--quiet"], env={"PIP_DISABLE_PIP_VERSION_CHECK": "1"}, check=True)
+              print("Installed cloudpickle globally", file=sys.stderr)
+          except:
+              print("Failed to install cloudpickle globally. Installing for the current user.", file=sys.stderr)
+              subprocess.run([sys.executable, "-m", "pip", "install", "cloudpickle==1.1.1", "--user", "--quiet"], env={"PIP_DISABLE_PIP_VERSION_CHECK": "1"}, check=True)
+              print("Installed cloudpickle for the current user", file=sys.stderr)
+              # Enable loading from user-installed package directory. Python does not add it to sys.path if it was empty at start. Running pip does not refresh `sys.path`.
+              import site
+              sys.path.append(site.getusersitepackages())
+          import cloudpickle as _cloudpickle
+          print("cloudpickle loaded successfully after installing.", file=sys.stderr)
+
+      pickler_python_version = (3, 10, 13, 'final', 0)
+      current_python_version = tuple(sys.version_info)
+      if (
+          current_python_version[0] != pickler_python_version[0] or
+          current_python_version[1] < pickler_python_version[1] or
+          current_python_version[0] == 3 and ((pickler_python_version[1] < 6) != (current_python_version[1] < 6))
+          ):
+          raise RuntimeError("Incompatible python versions: " + str(current_python_version) + " instead of " + str(pickler_python_version))
+
+      if current_python_version != pickler_python_version:
+          print("Warning!: Different python versions. The code may crash! Current environment python version: " + str(current_python_version) + ". Component code python version: " + str(pickler_python_version), file=sys.stderr)
+
+      import base64
+      import pickle
+
+      model_training = pickle.loads(base64.b64decode(b'gASV6QoAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwNLAEsASwxLBEtDQ4xkAWQAbAB9A2QBZABsAX0EZAFkAGwCfQVkAWQAbAN9BmQBZAJsBG0FfQcBAHwDoAZkA6EBfQh0B2QEfAibAJ0CgwEBAHwGoAh8AKEBfQB0CXwAZAWDAn0JfAmgCqEAfQp8CaALoQB9C3QHZAaDAQEAfAagDHwKfAGhAgEAfAagDHwLfAKhAgEAZABTAJQoTksAjA9UZmlkZlZlY3Rvcml6ZXKUhZSMC0VOVklST05NRU5UlIwLUnVubmluZyBvbiCUTdAHjBNEb25lIHRyYWluaW5nIG1vZGVslHSUKIwCb3OUjANzeXOUjAZwYW5kYXOUjAZqb2JsaWKUjB9za2xlYXJuLmZlYXR1cmVfZXh0cmFjdGlvbi50ZXh0lGgJjAZnZXRlbnaUjAVwcmludJSMBGxvYWSUjAtSZWNvbW1lbmRlcpSMC2luaXRfbWF0cml4lIwWbWFwX21vdmllX3RpdGxlX3RvX2lkeJSMBGR1bXCUdJQojAJkZpSMC21hdHJpeF9wYXRolIwObW92aWUyaWR4X3BhdGiUaA9oEIwCcGSUaBJoCWgLjAtyZWNvbW1lbmRlcpSMBm1hdHJpeJSMCW1vdmllMmlkeJR0lIxmL2hvbWUvbWFucG0vRGV2ZWxvcGVycy9NTEUtQ291cnNlL21vdmllLXJlY29tbWVuZGF0aW9uLXN5c3RlbS8uL2NvbXBvbmVudHMvbW9kZWxfdHJhaW5pbmcvY29tcG9uZW50LnB5lIwObW9kZWxfdHJhaW5pbmeUSwxDGhAFCAEIAQwBCgIOAQoCCgIIAggCCAEMARABlCkpdJRSlH2UKIwLX19wYWNrYWdlX1+UTowIX19uYW1lX1+UjAhfX21haW5fX5SMCF9fZmlsZV9flGgkdU5OTnSUUpSMHGNsb3VkcGlja2xlLmNsb3VkcGlja2xlX2Zhc3SUjBJfZnVuY3Rpb25fc2V0c3RhdGWUk5RoL32UfZQoaCtoJYwMX19xdWFsbmFtZV9flGgljA9fX2Fubm90YXRpb25zX1+UfZQoaByMGWtmcC5jb21wb25lbnRzLl9weXRob25fb3CUjAlJbnB1dFBhdGiUk5QpgZR9lIwEdHlwZZSMA1BLTJRzYmgdaDiMCk91dHB1dFBhdGiUk5QpgZR9lGg9aD5zYmgeaEApgZR9lGg9aD5zYnWMDl9fa3dkZWZhdWx0c19flE6MDF9fZGVmYXVsdHNfX5ROjApfX21vZHVsZV9flGgsjAdfX2RvY19flE6MC19fY2xvc3VyZV9flE6MF19jbG91ZHBpY2tsZV9zdWJtb2R1bGVzlF2UjAtfX2dsb2JhbHNfX5R9lGgXaACMFF9tYWtlX3NrZWxldG9uX2NsYXNzlJOUKIwIYnVpbHRpbnOUjAR0eXBllJOUaBdoUIwGb2JqZWN0lJOUhZR9lGhHjBF1dGlscy5tb2RlbF91dGlsc5RzjCBkOWIzNTczMjM0YTg0NzhhYjYzMDUxNjIwZWE2NTY3ZZROdJRSlGgwjA9fY2xhc3Nfc2V0c3RhdGWUk5RoWn2UKGhHaFeMCF9faW5pdF9flGgCKGgHKEsDSwBLAEsDSwNLQ0MWdAB8AmQBjQF8AF8BfAF8AF8CZABTAJROjAxtYXhfZmVhdHVyZXOUhZSGlGgJjAV0ZmlkZpRoHIeUjARzZWxmlGgcaGCHlIxUL2hvbWUvbWFucG0vRGV2ZWxvcGVycy9NTEUtQ291cnNlL21vdmllLXJlY29tbWVuZGF0aW9uLXN5c3RlbS8uL3V0aWxzL21vZGVsX3V0aWxzLnB5lGheSwlDBgwBBgEEAZQpKXSUUpR9lChoKowFdXRpbHOUaCtoV2gtaGd1Tk5OdJRSlGgyaG59lH2UKGgraF5oNYwUUmVjb21tZW5kZXIuX19pbml0X1+UaDZ9lChoHIwRcGFuZGFzLmNvcmUuZnJhbWWUjAlEYXRhRnJhbWWUk5RoYGhQjANpbnSUk5SMBnJldHVybpROdWhFTmhGTmhHaFdoSE5oSU5oSl2UaEx9lGgJjB9za2xlYXJuLmZlYXR1cmVfZXh0cmFjdGlvbi50ZXh0lGgJk5RzdYaUhlIwaBloAihoByhLAUsASwBLAUsES0NDIHQAagF8AGoCagN8AGoCZAEZAGQCjQJ8AF8EfABqBFMAlE6MBXRpdGxllIwFaW5kZXiUhZSHlChoH4wGU2VyaWVzlGgcaIBoInSUaGWFlGhnaBlLDkMEGgEGAZQpKXSUUpRoa05OTnSUUpRoMmiKfZR9lChoK2gZaDWMIlJlY29tbWVuZGVyLm1hcF9tb3ZpZV90aXRsZV90b19pZHiUaDZ9lGh4jBJwYW5kYXMuY29yZS5zZXJpZXOUaIOTlHNoRU5oRk5oR2hXaEhOaElOaEpdlGhMfZRoH2gAjAlzdWJpbXBvcnSUk5RoEYWUUpRzdYaUhlIwaBhoAihoByhLAUsASwBLAUsES0NDGnwAagCgAXwAagJkARkAoQF8AF8DfABqA1MAlE6MBnN0cmluZ5SGlChoY4wNZml0X3RyYW5zZm9ybZRoHGghdJRohWhnaBhLEkMEFAEGAZQpKXSUUpRoa05OTnSUUpRoMmihfZR9lChoK2gYaDWMF1JlY29tbWVuZGVyLmluaXRfbWF0cml4lGg2fZRoeIwUc2NpcHkuc3BhcnNlLl9tYXRyaXiUjAhzcG1hdHJpeJSTlHNoRU5oRk5oR2hXaEhOaElOaEpdlGhMfZR1hpSGUjCMCXJlY29tbWVuZJRoAihoByhLA0sASwBLB0sES0NDnnwAagBkAGsCcg50AWQBgwEBAHQCoANkAqEBAQB8AGoEZABrAnIcdAFkA4MBAQB0AqADZAKhAQEAfABqAHwBGQB9A3QFfAODAXQGagdrAnItfANqCGQEGQB9A3wAagR8AxkAfQR0CXwEfABqBIMCfQV8BaAKoQB9BXwFCwCgC6EAZAJ8AmQCFwCFAhkAfQZ8AGoMZAUZAGoIfAYZAFMAlChOjC5SdW4gcmVjb21tZW5kZXIubWFwX21vdmllX3RpdGxlX3RvX2lkeCgpIGZpcnN0lEsBjCNSdW4gcmVjb21tZW5kZXIuaW5pdF9tYXRyaXgoKSBmaXJzdJRLAGh/dJQoaCJoFWgQjARleGl0lGghaD1oH2iDjARpbG9jlIwRY29zaW5lX3NpbWlsYXJpdHmUjAdmbGF0dGVulIwHYXJnc29ydJRoHHSUKGhlaH+MAWuUjANpZHiUjAVxdWVyeZSMBnNjb3Jlc5SMD3JlY29tbWVuZGVkX2lkeJR0lGhnaKxLF0McCgEIAQoBCgEIAQoBCgMOAQoBCgMMAQgDFgUQA5QpKXSUUpRoa05OTnSUUpRoMmjBfZR9lChoK2isaDWMFVJlY29tbWVuZGVyLnJlY29tbWVuZJRoNn2UaHhokHNoRU5oRk5oR2hXaEhOaElOaEpdlGhMfZQoaBBolIwDc3lzlIWUUpRoH2iWaLOMGHNrbGVhcm4ubWV0cmljcy5wYWlyd2lzZZRos5OUdXWGlIZSMGhITnV9lIaUhlIwc3WGlIZSMC4='))
+
+      import argparse
+      _parser = argparse.ArgumentParser(prog='Model training', description='')
+      _parser.add_argument("--df", dest="df", type=str, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--matrix", dest="matrix_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--movie2idx", dest="movie2idx_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+      _parsed_args = vars(_parser.parse_args())
+
+      _outputs = model_training(**_parsed_args)
+    args:
+    - --df
+    - {inputPath: df}
+    - --matrix
+    - {outputPath: matrix}
+    - --movie2idx
+    - {outputPath: movie2idx}

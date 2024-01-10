@@ -1,0 +1,74 @@
+name: Model evaluation
+inputs:
+- {name: df, type: PKL}
+- {name: matrix, type: PKL}
+- {name: movie2idx, type: PKL}
+implementation:
+  container:
+    image: python:3.10
+    command:
+    - sh
+    - -c
+    - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+      'joblib' 'cloudpickle' 'pandas' 'kfp==1.8.22' 'matplotlib==3.8.2' 'scikit-learn==1.3.2'
+      'SciPy==1.11.4' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet
+      --no-warn-script-location 'joblib' 'cloudpickle' 'pandas' 'kfp==1.8.22' 'matplotlib==3.8.2'
+      'scikit-learn==1.3.2' 'SciPy==1.11.4' --user) && "$0" "$@"
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp)
+      printf "%s" "$0" > "$program_path"
+      python3 -u "$program_path" "$@"
+    - |
+      import sys
+      try:
+          import cloudpickle as _cloudpickle
+      except ImportError:
+          import subprocess
+          try:
+              print("cloudpickle is not installed. Installing it globally", file=sys.stderr)
+              subprocess.run([sys.executable, "-m", "pip", "install", "cloudpickle==1.1.1", "--quiet"], env={"PIP_DISABLE_PIP_VERSION_CHECK": "1"}, check=True)
+              print("Installed cloudpickle globally", file=sys.stderr)
+          except:
+              print("Failed to install cloudpickle globally. Installing for the current user.", file=sys.stderr)
+              subprocess.run([sys.executable, "-m", "pip", "install", "cloudpickle==1.1.1", "--user", "--quiet"], env={"PIP_DISABLE_PIP_VERSION_CHECK": "1"}, check=True)
+              print("Installed cloudpickle for the current user", file=sys.stderr)
+              # Enable loading from user-installed package directory. Python does not add it to sys.path if it was empty at start. Running pip does not refresh `sys.path`.
+              import site
+              sys.path.append(site.getusersitepackages())
+          import cloudpickle as _cloudpickle
+          print("cloudpickle loaded successfully after installing.", file=sys.stderr)
+
+      pickler_python_version = (3, 10, 13, 'final', 0)
+      current_python_version = tuple(sys.version_info)
+      if (
+          current_python_version[0] != pickler_python_version[0] or
+          current_python_version[1] < pickler_python_version[1] or
+          current_python_version[0] == 3 and ((pickler_python_version[1] < 6) != (current_python_version[1] < 6))
+          ):
+          raise RuntimeError("Incompatible python versions: " + str(current_python_version) + " instead of " + str(pickler_python_version))
+
+      if current_python_version != pickler_python_version:
+          print("Warning!: Different python versions. The code may crash! Current environment python version: " + str(current_python_version) + ". Component code python version: " + str(pickler_python_version), file=sys.stderr)
+
+      import base64
+      import pickle
+
+      model_evaluation = pickle.loads(base64.b64decode(b'gASVzAQAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwNLAEsASxBLA0tDQ8pkAWQAbAB9A2QBZABsAX0EZAFkAGwCfQVkAWQAbAN9BmQBZAJsBG0FfQcBAGQBZABsBm0HfQgBAHwDoAhkA6EBfQl0CWQEfAmbAJ0CgwEBAHwGoAp8AKEBfQB8BqAKfAGhAX0KfAagCnwCoQF9AnwCZAUZAH0LfAp8CxkAfQx8B3wMfAqDAn0NfA2gC6EAfQ18CKAMfA2hAQEAfA0LAKANoQBkBmQHhQIZAH0OfABkCBkAag58DhkAfQ90CWQJfA8XAIMBAQBkAFMAlChOSwCMEWNvc2luZV9zaW1pbGFyaXR5lIWUjAtFTlZJUk9OTUVOVJSMC1J1bm5pbmcgb24glIwGQXZhdGFylEsBSwaMBXRpdGxllIwdUmVjb21tZW5kYXRpb25zIGZvciAnQXZhdGFyJzqUdJQojAJvc5SMA3N5c5SMBnBhbmRhc5SMBmpvYmxpYpSMGHNrbGVhcm4ubWV0cmljcy5wYWlyd2lzZZRoCYwRbWF0cGxvdGxpYi5weXBsb3SUjAZweXBsb3SUjAZnZXRlbnaUjAVwcmludJSMBGxvYWSUjAdmbGF0dGVulIwEcGxvdJSMB2FyZ3NvcnSUjARpbG9jlHSUKIwCZGaUjAZtYXRyaXiUjAltb3ZpZTJpZHiUaBFoEowCcGSUaBRoCYwDcGx0lGgLjAFYlIwDaWR4lIwFcXVlcnmUjAZzY29yZXOUjA9yZWNvbW1lbmRlZF9pZHiUjBByZWNvbW1lbmRlZF9maWxllHSUjGgvaG9tZS9tYW5wbS9EZXZlbG9wZXJzL01MRS1Db3Vyc2UvbW92aWUtcmVjb21tZW5kYXRpb24tc3lzdGVtLy4vY29tcG9uZW50cy9tb2RlbF9ldmFsdWF0aW9uL2NvbXBvbmVudC5weZSMEG1vZGVsX2V2YWx1YXRpb26USwtDJBAFCAEIAQwBDAEKAg4BCgMKAQoBCAIIAgoDCAEKAhIFDgMQAZQpKXSUUpR9lCiMC19fcGFja2FnZV9flE6MCF9fbmFtZV9flIwIX19tYWluX1+UjAhfX2ZpbGVfX5RoLHVOTk50lFKUjBxjbG91ZHBpY2tsZS5jbG91ZHBpY2tsZV9mYXN0lIwSX2Z1bmN0aW9uX3NldHN0YXRllJOUaDd9lH2UKGgzaC2MDF9fcXVhbG5hbWVfX5RoLYwPX19hbm5vdGF0aW9uc19flH2UKGggjBlrZnAuY29tcG9uZW50cy5fcHl0aG9uX29wlIwJSW5wdXRQYXRolJOUKYGUfZSMBHR5cGWUjANQS0yUc2JoIWhCKYGUfZRoRWhGc2JoImhCKYGUfZRoRWhGc2J1jA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoNIwHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu'))
+
+      import argparse
+      _parser = argparse.ArgumentParser(prog='Model evaluation', description='')
+      _parser.add_argument("--df", dest="df", type=str, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--matrix", dest="matrix", type=str, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--movie2idx", dest="movie2idx", type=str, required=True, default=argparse.SUPPRESS)
+      _parsed_args = vars(_parser.parse_args())
+
+      _outputs = model_evaluation(**_parsed_args)
+    args:
+    - --df
+    - {inputPath: df}
+    - --matrix
+    - {inputPath: matrix}
+    - --movie2idx
+    - {inputPath: movie2idx}
