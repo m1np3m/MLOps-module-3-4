@@ -20,21 +20,27 @@ model_training_op = load_component_from_file(
 model_evaluation_op = load_component_from_file(
     f"{COMPONENTS_DIR}/model_evaluation/component.yaml"
 )
+feature_store_op = load_component_from_file(
+    f"{COMPONENTS_DIR}/feature_store/component.yaml"
+)
+
+vop = dsl.VolumeOp(name="creds_volume", resource_name="mypvc", size="1Gi")
 
 
 # Define a pipeline and create a task from above components:
 @dsl.pipeline(name=PIPELINE_NAME, description=PIPELINE_DESCRIPTION)
 def pipeline(url: str):
-    data_downloading_task = data_downloading_op(url=url)
-    data_preprocessing_task = data_preprocessing_op(
-        input_df=data_downloading_task.outputs["data"]
-    )
-    model_training_task = model_training_op(df=data_preprocessing_task.outputs["df"])
-    model_evalution_task = model_evaluation_op(
-        df=data_preprocessing_task.outputs["df"],
-        matrix=model_training_task.outputs["matrix"],
-        movie2idx=model_training_task.outputs["movie2idx"],
-    )
+    # data_downloading_task = data_downloading_op(url=url)
+    # data_preprocessing_task = data_preprocessing_op(
+    #     input_df=data_downloading_task.outputs["data"]
+    # )
+    # model_training_task = model_training_op(df=data_preprocessing_task.outputs["df"])
+    # model_evalution_task = model_evaluation_op(
+    #     df=data_preprocessing_task.outputs["df"],
+    #     matrix=model_training_task.outputs["matrix"],
+    #     movie2idx=model_training_task.outputs["movie2idx"],
+    # )
+    feature_store_task = feature_store_op(url=url)
 
 
 if __name__ == "__main__":
@@ -42,7 +48,7 @@ if __name__ == "__main__":
     parser.add_argument("--dev", action="store_true")
     args = parser.parse_args()
     pipeline_args = {}
-    pipeline_args["url"] = DATA_URL.format(MOVIES_CSV)
+    pipeline_args["url"] = DATA_URL.format(DRIVER_ORDERS_CSV)
 
     kf = KubeFlow(
         namespace=NAMESPACE,

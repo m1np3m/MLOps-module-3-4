@@ -1,0 +1,20 @@
+
+P
+0
+	driver_id	driver id"	driver_idJfeature_store
+º²‰­€øŒ¹º²‰­€øŒ¹
+D
+$
+__dummy"
+__dummy_idJfeature_store
+º²‰­èó¹º²‰­èó¹1"$8d954fc7-69c3-4576-b0fc-e189744d8056*º²‰­˜ÈÃ¹2©
+ˆ
+driver_hourly_statsfeature_store	driver_id"
+	conv_rate"
+acc_rate"
+avg_daily_trips2€£:event_timestamp*createdZ./data/driver_stats.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢./data/driver_stats.parquet@b
+	driver_id
+‰±‰­Øù³§‰±‰­Øù³§bevent_timestamp*createdZ./data/driver_stats.parquetŠ1feast.infra.offline_stores.file_source.FileSource¢./data/driver_stats.parquetªfeature_storez2
+
+feast_demo$ea09c512-b80e-4748-ad3c-8078827fe016z5
+feature_store$f77b90be-5645-4713-8c8c-2e3fc588f868

@@ -1,0 +1,66 @@
+name: Feature store
+inputs:
+- {name: url, type: String}
+implementation:
+  container:
+    image: python:3.10
+    command:
+    - sh
+    - -c
+    - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+      'joblib' 'cloudpickle' 'pandas' 'kfp==1.8.22' 'feast[redis, postgres]' 'scikit-learn==1.3.2'
+      'SciPy==1.11.4' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet
+      --no-warn-script-location 'joblib' 'cloudpickle' 'pandas' 'kfp==1.8.22' 'feast[redis,
+      postgres]' 'scikit-learn==1.3.2' 'SciPy==1.11.4' --user) && "$0" "$@"
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp)
+      printf "%s" "$0" > "$program_path"
+      python3 -u "$program_path" "$@"
+    - |
+      import sys
+      try:
+          import cloudpickle as _cloudpickle
+      except ImportError:
+          import subprocess
+          try:
+              print("cloudpickle is not installed. Installing it globally", file=sys.stderr)
+              subprocess.run([sys.executable, "-m", "pip", "install", "cloudpickle==1.1.1", "--quiet"], env={"PIP_DISABLE_PIP_VERSION_CHECK": "1"}, check=True)
+              print("Installed cloudpickle globally", file=sys.stderr)
+          except:
+              print("Failed to install cloudpickle globally. Installing for the current user.", file=sys.stderr)
+              subprocess.run([sys.executable, "-m", "pip", "install", "cloudpickle==1.1.1", "--user", "--quiet"], env={"PIP_DISABLE_PIP_VERSION_CHECK": "1"}, check=True)
+              print("Installed cloudpickle for the current user", file=sys.stderr)
+              # Enable loading from user-installed package directory. Python does not add it to sys.path if it was empty at start. Running pip does not refresh `sys.path`.
+              import site
+              sys.path.append(site.getusersitepackages())
+          import cloudpickle as _cloudpickle
+          print("cloudpickle loaded successfully after installing.", file=sys.stderr)
+
+      pickler_python_version = (3, 10, 13, 'final', 0)
+      current_python_version = tuple(sys.version_info)
+      if (
+          current_python_version[0] != pickler_python_version[0] or
+          current_python_version[1] < pickler_python_version[1] or
+          current_python_version[0] == 3 and ((pickler_python_version[1] < 6) != (current_python_version[1] < 6))
+          ):
+          raise RuntimeError("Incompatible python versions: " + str(current_python_version) + " instead of " + str(pickler_python_version))
+
+      if current_python_version != pickler_python_version:
+          print("Warning!: Different python versions. The code may crash! Current environment python version: " + str(current_python_version) + ". Component code python version: " + str(pickler_python_version), file=sys.stderr)
+
+      import base64
+      import pickle
+
+      feature_store = pickle.loads(base64.b64decode(b'gASVwgsAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwFLAEsASxFLCktDQ/RkAWQAbAB9AWQBZABsAX0CZAFkAGwCfQNkAWQAbAN9BGQBZABsBH0FZAFkAmwEbQV9Bm0GfQcBAGQBZANsB20IfQgBAGQBZARsCW0KfQkBAGQBZAVsC20MfQoBAGQBZAZsA20NfQsBAGQBZABsDn0MfANqD3QQoBF0EqEBZAdkCI0CfQ18A6ATfA1kCRkAoQF8DWQJPAB8AaAUZAqhAX0OdBVkC3wOmwCdAoMBAQB8BnwIZAxkDY0BZA5kD3wJZBBkEWQSZBNkFI0EfApkFWQWZBdkGI0DZBmNBX0PfAd8D2QajQF9EHQWfBBkG4MCAQBkAFMAlChOSwCMClJlcG9Db25maWeUjAxGZWF0dXJlU3RvcmWUhpSMDlJlZ2lzdHJ5Q29uZmlnlIWUjBxQb3N0Z3JlU1FMT2ZmbGluZVN0b3JlQ29uZmlnlIWUjBZSZWRpc09ubGluZVN0b3JlQ29uZmlnlIWUjARkdW1wlIWUjAEJlIwDc2VwlIWUjA9ldmVudF90aW1lc3RhbXCUjAtFTlZJUk9OTUVOVJSMC1J1bm5pbmcgb24glIwqZ3M6Ly9rZW5kX2ZlYXR1cmVfc3RvcmVfYnVja2V0L3JlZ2lzdHJ5LnBilIwEcGF0aJSFlIwNZmVhdHVyZV9zdG9yZZSMBWxvY2FslIwjcG9zdGdyZXMucG9zdGdyZXMuc3ZjLmNsdXN0ZXIubG9jYWyUjAhwb3N0Z3Jlc5SMBWFkbWlulIwIMTIzNDEyMzSUKIwEaG9zdJSMCGRhdGFiYXNllIwEdXNlcpSMCHBhc3N3b3JklHSUjAVyZWRpc5SMDXJlZGlzX2NsdXN0ZXKUjEJyZWRpcy1tYXN0ZXI6NjM3OSxyZWRpcy1yZXBsaWNhczo2Mzc5LHNzbD10cnVlLHBhc3N3b3JkPUhaeFV3WFN1c1mUjAR0eXBllIwKcmVkaXNfdHlwZZSMEWNvbm5lY3Rpb25fc3RyaW5nlIeUKIwIcmVnaXN0cnmUjAdwcm9qZWN0lIwIcHJvdmlkZXKUjA1vZmZsaW5lX3N0b3JllIwMb25saW5lX3N0b3JllHSUjAZjb25maWeUhZSJdJQojAJvc5SMA3N5c5SMBnBhbmRhc5SMBmpvYmxpYpSMBWZlYXN0lGgJaAqMEWZlYXN0LnJlcG9fY29uZmlnlGgMjEJmZWFzdC5pbmZyYS5vZmZsaW5lX3N0b3Jlcy5jb250cmliLnBvc3RncmVzX29mZmxpbmVfc3RvcmUucG9zdGdyZXOUaA6MH2ZlYXN0LmluZnJhLm9ubGluZV9zdG9yZXMucmVkaXOUaBBoEowKc3VicHJvY2Vzc5SMCHJlYWRfY3N2lIwIREFUQV9VUkyUjAZmb3JtYXSUjBFEUklWRVJfT1JERVJTX0NTVpSMC3RvX2RhdGV0aW1llIwGZ2V0ZW52lIwFcHJpbnSUjCNmZXRjaF9oaXN0b3JpY2FsX2ZlYXR1cmVzX2VudGl0eV9kZpR0lCiMA3VybJRoOGg5jAJwZJRoO2g8aAloCmgMaA5oEGgSaECMBm9yZGVyc5RoGIwLcmVwb19jb25maWeUjAVzdG9yZZR0lIxrL2hvbWUvbWFucG0vRGV2ZWxvcGVycy9NTE9wcy1tb2R1bGUtMy00L21vdmllLXJlY29tbWVuZGF0aW9uLXN5c3RlbS8uL2NvbXBvbmVudHMvZmVhdHVyZV9zdG9yZS9jb21wb25lbnQucHmUaB1LDENEEAEIAQgBCAEQAQwBDAEMAwwBCAEUBRIBCgMOAQICAgECAwT9AgYCAQIBAgECAQIBAgEE/AIGAgECAQIBBP0G8QoVDgGUKSl0lFKUfZQojAtfX3BhY2thZ2VfX5ROjAhfX25hbWVfX5SMCF9fbWFpbl9flIwIX19maWxlX1+UaFB1Tk5OdJRSlIwcY2xvdWRwaWNrbGUuY2xvdWRwaWNrbGVfZmFzdJSMEl9mdW5jdGlvbl9zZXRzdGF0ZZSTlGhafZR9lChoVmgdjAxfX3F1YWxuYW1lX1+UaB2MD19fYW5ub3RhdGlvbnNfX5R9lGhKjAhidWlsdGluc5SMA3N0cpSTlHOMDl9fa3dkZWZhdWx0c19flE6MDF9fZGVmYXVsdHNfX5ROjApfX21vZHVsZV9flGhXjAdfX2RvY19flE6MC19fY2xvc3VyZV9flE6MF19jbG91ZHBpY2tsZV9zdWJtb2R1bGVzlF2UjAtfX2dsb2JhbHNfX5R9lChoQoxXaHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2ZlYXN0LWRldi9mZWFzdC1nY3AtZHJpdmVyLXJhbmtpbmctdHV0b3JpYWwvbWFzdGVyL3t9lGhEjBFkcml2ZXJfb3JkZXJzLmNzdpRoSGgCKGgHKEsCSwBLAEsESwxLQ0OUdABqAaACZwBkAaIBdANkAmQDZARkBWQGZAeDBnQDZAJkA2QEZAhkBGQFgwZ0A2QCZANkBGQJZApkC4MGZwNnAGQMogFnAGQNogFnAGQOogFkD5wFoQF9AnwBcjd0AGoEZBBkEWQSjQJ8AmQTPAB8AGoFfAJnAGQUogFkFY0CoAahAH0DdAd8A6AIoQCDAQEAZABTAJQoTk3pA03qA03rA4eUTeUHSwRLDEsKSztLKksISxBLKEsaSwFLBUsDh5RLAUsCSwOHlEsKSxRLHoeUKIwJZHJpdmVyX2lklGgXjCJsYWJlbF9kcml2ZXJfcmVwb3J0ZWRfc2F0aXNmYWN0aW9ulIwKdmFsX3RvX2FkZJSMDHZhbF90b19hZGRfMpR0lIwDbm93lIiMA3V0Y5SFlGgXKIwdZHJpdmVyX2hvdXJseV9zdGF0czpjb252X3JhdGWUjBxkcml2ZXJfaG91cmx5X3N0YXRzOmFjY19yYXRllIwjZHJpdmVyX2hvdXJseV9zdGF0czphdmdfZGFpbHlfdHJpcHOUjCl0cmFuc2Zvcm1lZF9jb252X3JhdGU6Y29udl9yYXRlX3BsdXNfdmFsMZSMKXRyYW5zZm9ybWVkX2NvbnZfcmF0ZTpjb252X3JhdGVfcGx1c192YWwylHSUjAllbnRpdHlfZGaUjAhmZWF0dXJlc5SGlHSUKGhLjAlEYXRhRnJhbWWUjAlmcm9tX2RpY3SUjAhkYXRldGltZZRoRYwXZ2V0X2hpc3RvcmljYWxfZmVhdHVyZXOUjAV0b19kZpRoR4wEaGVhZJR0lChoTowRZm9yX2JhdGNoX3Njb3JpbmeUaISMC3RyYWluaW5nX2RmlHSUjFovaG9tZS9tYW5wbS9EZXZlbG9wZXJzL01MT3BzLW1vZHVsZS0zLTQvbW92aWUtcmVjb21tZW5kYXRpb24tc3lzdGVtLy4vdXRpbHMvZmVhc3RfdXRpbHMucHmUaEhLFEMoBgMGAxADEAEQAQL9BgYGAgYBBPME/wQSEgEEAgIBBgEE/gQJAvcQCpQpKXSUUpR9lChoVYwFdXRpbHOUaFaMEXV0aWxzLmZlYXN0X3V0aWxzlGhYjFovaG9tZS9tYW5wbS9EZXZlbG9wZXJzL01MT3BzLW1vZHVsZS0zLTQvbW92aWUtcmVjb21tZW5kYXRpb24tc3lzdGVtLy4vdXRpbHMvZmVhc3RfdXRpbHMucHmUdU5OTnSUUpRoXWibfZR9lChoVmhIaGBoSGhhfZQoaE6ME2ZlYXN0LmZlYXR1cmVfc3RvcmWUaAqTlGiPaGOMBGJvb2yUk5R1aGZOaGdOaGhomGhpTmhqTmhrXZRobX2UKGhLaACMCXN1YmltcG9ydJSTlGg6hZRSlGiKaIqMCGRhdGV0aW1llJOUdXWGlIZSMHV1hpSGUjAu'))
+
+      import argparse
+      _parser = argparse.ArgumentParser(prog='Feature store', description='')
+      _parser.add_argument("--url", dest="url", type=str, required=True, default=argparse.SUPPRESS)
+      _parsed_args = vars(_parser.parse_args())
+
+      _outputs = feature_store(**_parsed_args)
+    args:
+    - --url
+    - {inputValue: url}

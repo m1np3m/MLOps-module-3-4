@@ -3,8 +3,8 @@ import datetime
 from uuid import uuid4
 
 # https://www.kaggle.com/tmdb/tmdb-movie-metadata
-DATA_URL = "https://raw.githubusercontent.com/CTopham/TophamRepo/master/Movie%20Project/Resources/{}"
-MOVIES_CSV = "tmdb_5000_movies.csv"
+DATA_URL = "https://raw.githubusercontent.com/feast-dev/feast-gcp-driver-ranking-tutorial/master/{}"
+DRIVER_ORDERS_CSV = "driver_orders.csv"
 
 BASE_DIR = Path(__file__).parent.parent.absolute()
 CONFIG_DIR = Path(BASE_DIR, "config")

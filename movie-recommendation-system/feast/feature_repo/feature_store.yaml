@@ -1,0 +1,17 @@
+project: feast
+# By default, the registry is a file (but can be turned into a more scalable SQL-backed registry)
+registry: data/registry.db
+# The provider primarily specifies default offline / online stores & storing the registry in a given cloud
+provider: local
+offline_store:
+    type: postgres
+    host: localhost
+    port: 5432
+    database: postgres
+    user: admin
+    password: "12341234"
+online_store:
+    type: redis
+    redis_type: redis_cluster
+    connection_string: "localhost:6379,localhost:6378,ssl=true,password=US1x0rcNLD"
+entity_key_serialization_version: 2
