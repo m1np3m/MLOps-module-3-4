@@ -22,39 +22,52 @@ def feature_store(url: str):
     from feast.infra.online_stores.redis import RedisOnlineStoreConfig
     from joblib import dump
     import subprocess
+    import wget
+    from datetime import timedelta
+    from feast import (
+        Entity,
+        FeatureService,
+        FeatureView,
+        Field,
+        FileSource,
+        PushSource,
+        RequestSource,
+    )
+
+    from feast.on_demand_feature_view import on_demand_feature_view
+    from feast.types import Float32, Float64, Int64
+
+    from feast.on_demand_feature_view import on_demand_feature_view
+    from feast.types import Float32, Float64, Int64
 
     # from sklearn.linear_model import LinearRegression
 
     # Load driver order data
     orders = pd.read_csv(DATA_URL.format(DRIVER_ORDERS_CSV), sep="\t")
     orders["event_timestamp"] = pd.to_datetime(orders["event_timestamp"])
+    data_path = "./data"
 
-    # Connect to your feature store provider
-    ENVIRONMENT = os.getenv("ENVIRONMENT")
-    print(f"Running on {ENVIRONMENT}")
+    # Down load the registry
+    registry_db_url = "https://github.com/m1np3m/MLOps-module-3-4/raw/main/movie-recommendation-system/feast/feature_repo/data/registry.db"
+    driver_stats_parquet_url = "https://github.com/m1np3m/MLOps-module-3-4/raw/main/movie-recommendation-system/feast/feature_repo/data/driver_stats.parquet"
+    feature_store_url = "https://raw.githubusercontent.com/m1np3m/MLOps-module-3-4/main/movie-recommendation-system/feast/feature_repo/feature_store.yaml"
+    Path("./data").mkdir(parents=True, exist_ok=True)
+    registry_db = wget.download(registry_db_url, out=data_path)
+    print(f"registry_db existed: { os.path.exists(registry_db)}")
+    driver_stats_parquet = wget.download(driver_stats_parquet_url, out=data_path)
+    print(f"driver_stats_parquet existed: { os.path.exists(driver_stats_parquet)}")
+    feature_store_parquet = wget.download(feature_store_url)
+    print(f"feature_store.yaml existed: { os.path.exists(feature_store_parquet)}")
 
-    repo_config = RepoConfig(
-        registry=RegistryConfig(
-            # registry_type="PostgreSQLRegistry",
-            # registry_store_type="PostgreSQLRegistryStore",
-            path="gs://kend_feature_store_bucket/registry.pb",
-        ),
-        # registry="./data/registry.db",
-        project="feature_store",
-        provider="local",
-        offline_store=PostgreSQLOfflineStoreConfig(
-            host="postgres.postgres.svc.cluster.local",
-            database="postgres",
-            user="admin",
-            password="12341234",
-        ),  # Could also be the OfflineStoreConfig e.g. FileOfflineStoreConfig
-        online_store=RedisOnlineStoreConfig(
-            type="redis",
-            redis_type="redis_cluster",
-            connection_string="redis-master:6379,redis-replicas:6379,ssl=true,password=HZxUwXSusY",
-        ),  # Could also be the OnlineStoreConfig e.g. RedisOnlineStoreConfig
+    example_feature_repo = wget.download(
+        "https://raw.githubusercontent.com/m1np3m/MLOps-module-3-4/main/movie-recommendation-system/feast/feature_repo/example_repo.py"
     )
-    store = FeatureStore(config=repo_config)
+    print(f"example_feature_repo existed: {os.path.exists(example_feature_repo)}")
+
+    store = FeatureStore(repo_path=".")
+    print("\n--- Run feast apply ---")
+    subprocess.run(["feast", "apply"])
+
     fetch_historical_features_entity_df(store, False)
 
 
@@ -75,6 +88,7 @@ if __name__ == "__main__":
             "feast[redis, postgres]",
             "scikit-learn==1.3.2",
             "SciPy==1.11.4",
+            "wget==3.2",
         ],
         use_code_pickling=True,
         base_image=COMPONENT_BASE_IMAGE,
