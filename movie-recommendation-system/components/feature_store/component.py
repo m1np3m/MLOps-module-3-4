@@ -37,9 +37,6 @@ def feature_store(url: str):
     from feast.on_demand_feature_view import on_demand_feature_view
     from feast.types import Float32, Float64, Int64
 
-    from feast.on_demand_feature_view import on_demand_feature_view
-    from feast.types import Float32, Float64, Int64
-
     # from sklearn.linear_model import LinearRegression
 
     # Load driver order data
@@ -64,6 +61,8 @@ def feature_store(url: str):
     )
     print(f"example_feature_repo existed: {os.path.exists(example_feature_repo)}")
 
+    subprocess.run(["ls", "-l", "./data"])
+
     store = FeatureStore(repo_path=".")
     print("\n--- Run feast apply ---")
     subprocess.run(["feast", "apply"])
@@ -85,10 +84,12 @@ if __name__ == "__main__":
             "cloudpickle",
             "pandas",
             "kfp==1.8.22",
-            "feast[redis, postgres]",
+            "feast",
             "scikit-learn==1.3.2",
             "SciPy==1.11.4",
             "wget==3.2",
+            "psycopg2",
+            "feast[redis]",
         ],
         use_code_pickling=True,
         base_image=COMPONENT_BASE_IMAGE,

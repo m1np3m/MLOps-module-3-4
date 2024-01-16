@@ -3,7 +3,9 @@ project: feast
 registry: data/registry.db
 # The provider primarily specifies default offline / online stores & storing the registry in a given cloud
 provider: local
-offline_store: file
+offline_store:
+    type: file
 online_store:
+    type: sqlite
     path: data/online_store.db
 entity_key_serialization_version: 2
