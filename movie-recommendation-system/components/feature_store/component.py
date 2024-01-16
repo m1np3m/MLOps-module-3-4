@@ -79,7 +79,6 @@ if __name__ == "__main__":
             "scikit-learn==1.3.2",
             "SciPy==1.11.4",
             "wget==3.2",
-            "psycopg2",
             "feast",
         ],
         use_code_pickling=True,
