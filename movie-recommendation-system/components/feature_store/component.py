@@ -18,13 +18,14 @@ def feature_store(url: str):
     import subprocess
     import wget
     import time
+    from sklearn.linear_model import LinearRegression
 
     # Load driver order data
     orders = pd.read_csv(DATA_URL.format(DRIVER_ORDERS_CSV), sep="\t")
     orders["event_timestamp"] = pd.to_datetime(orders["event_timestamp"])
     data_path = "./data"
 
-    # Down load the registry
+    # Download the feast repo
     registry_db_url = "https://github.com/m1np3m/MLOps-module-3-4/raw/main/movie-recommendation-system/feast/feature_repo/data/registry.db"
     driver_stats_parquet_url = "https://github.com/m1np3m/MLOps-module-3-4/raw/main/movie-recommendation-system/feast/feature_repo/data/driver_stats.parquet"
     feature_store_url = "https://raw.githubusercontent.com/m1np3m/MLOps-module-3-4/main/movie-recommendation-system/feast/feature_repo/feature_store.yaml"
@@ -46,20 +47,32 @@ def feature_store(url: str):
     test_fill_flow_py = wget.download(test_fill_flow_url)
     print(f"test_fill_flow.py existed: {os.path.exists(test_fill_flow_py)}")
 
-    subprocess.run(["ls", "-l", "./data"])
-
+    # Initiate Feast Store
     store = FeatureStore(repo_path=".")
+    # Apply feature repo
     print("\n--- Run feast apply ---")
     subprocess.run(["feast", "apply"])
 
-    training_df = fetch_historical_features_entity_df(store, False)
-
+    # Fetch historical data for training
     try:
-        print(type(training_df))
-        df = training_df.to_df()
-        print(df.head())
+        # feature_service = store.get_feature_service("driver_activity_v1")
+        # training_df = store.get_historical_features(
+        #     features=feature_service, entity_df=orders
+        # )
+        training_df = fetch_historical_features_entity_df(store, False).to_df()
+        print(f"columns: {training_df.columns}")
+        print("training_df: ", training_df.head())
     except Exception as e:
         print(f"Error While convert historical data to df: {e}")
+
+    # Train model
+    target = "label_driver_reported_satisfaction"
+
+    print("\n--- Training model ---")
+    reg = LinearRegression()
+    train_X = training_df[training_df.columns.drop(target).drop("event_timestamp")]
+    train_Y = training_df.loc[:, target]
+    reg.fit(train_X[sorted(train_X)], train_Y)
 
 
 if __name__ == "__main__":
