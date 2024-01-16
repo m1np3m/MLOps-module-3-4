@@ -2,4 +2,4 @@ pandas
 kfp==1.8.22
 joblib==1.3.2
 protobuf==3.20.3
-feast[gcs, redis]
+feast

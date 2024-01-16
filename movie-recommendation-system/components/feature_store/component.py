@@ -14,30 +14,10 @@ def feature_store(url: str):
     import pandas as pd
     import joblib
     import feast
-    from feast import RepoConfig, FeatureStore
-    from feast.repo_config import RegistryConfig
-    from feast.infra.offline_stores.contrib.postgres_offline_store.postgres import (
-        PostgreSQLOfflineStoreConfig,
-    )
-    from feast.infra.online_stores.redis import RedisOnlineStoreConfig
-    from joblib import dump
+    from feast import FeatureStore
     import subprocess
     import wget
-    from datetime import timedelta
-    from feast import (
-        Entity,
-        FeatureService,
-        FeatureView,
-        Field,
-        FileSource,
-        PushSource,
-        RequestSource,
-    )
-
-    from feast.on_demand_feature_view import on_demand_feature_view
-    from feast.types import Float32, Float64, Int64
-
-    # from sklearn.linear_model import LinearRegression
+    import time
 
     # Load driver order data
     orders = pd.read_csv(DATA_URL.format(DRIVER_ORDERS_CSV), sep="\t")
@@ -48,6 +28,8 @@ def feature_store(url: str):
     registry_db_url = "https://github.com/m1np3m/MLOps-module-3-4/raw/main/movie-recommendation-system/feast/feature_repo/data/registry.db"
     driver_stats_parquet_url = "https://github.com/m1np3m/MLOps-module-3-4/raw/main/movie-recommendation-system/feast/feature_repo/data/driver_stats.parquet"
     feature_store_url = "https://raw.githubusercontent.com/m1np3m/MLOps-module-3-4/main/movie-recommendation-system/feast/feature_repo/feature_store.yaml"
+    online_db_url = "https://github.com/m1np3m/MLOps-module-3-4/raw/main/movie-recommendation-system/feast/feature_repo/data/online_store.db"
+    test_fill_flow_url = "https://raw.githubusercontent.com/m1np3m/MLOps-module-3-4/main/movie-recommendation-system/feast/feature_repo/test_workflow.py"
     Path("./data").mkdir(parents=True, exist_ok=True)
     registry_db = wget.download(registry_db_url, out=data_path)
     print(f"registry_db existed: { os.path.exists(registry_db)}")
@@ -55,11 +37,14 @@ def feature_store(url: str):
     print(f"driver_stats_parquet existed: { os.path.exists(driver_stats_parquet)}")
     feature_store_parquet = wget.download(feature_store_url)
     print(f"feature_store.yaml existed: { os.path.exists(feature_store_parquet)}")
-
+    online_db = wget.download(online_db_url, out=data_path)
+    print(f"online.db existed: { os.path.exists(online_db)}")
     example_feature_repo = wget.download(
         "https://raw.githubusercontent.com/m1np3m/MLOps-module-3-4/main/movie-recommendation-system/feast/feature_repo/example_repo.py"
     )
     print(f"example_feature_repo existed: {os.path.exists(example_feature_repo)}")
+    test_fill_flow_py = wget.download(test_fill_flow_url)
+    print(f"test_fill_flow.py existed: {os.path.exists(test_fill_flow_py)}")
 
     subprocess.run(["ls", "-l", "./data"])
 
@@ -67,7 +52,14 @@ def feature_store(url: str):
     print("\n--- Run feast apply ---")
     subprocess.run(["feast", "apply"])
 
-    fetch_historical_features_entity_df(store, False)
+    training_df = fetch_historical_features_entity_df(store, False)
+
+    try:
+        print(type(training_df))
+        df = training_df.to_df()
+        print(df.head())
+    except Exception as e:
+        print(f"Error While convert historical data to df: {e}")
 
 
 if __name__ == "__main__":
@@ -84,12 +76,11 @@ if __name__ == "__main__":
             "cloudpickle",
             "pandas",
             "kfp==1.8.22",
-            "feast",
             "scikit-learn==1.3.2",
             "SciPy==1.11.4",
             "wget==3.2",
             "psycopg2",
-            "feast[redis]",
+            "feast",
         ],
         use_code_pickling=True,
         base_image=COMPONENT_BASE_IMAGE,

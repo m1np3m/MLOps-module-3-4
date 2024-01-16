@@ -50,8 +50,8 @@ def fetch_historical_features_entity_df(store: FeatureStore, for_batch_scoring: 
             "transformed_conv_rate:conv_rate_plus_val1",
             "transformed_conv_rate:conv_rate_plus_val2",
         ],
-    ).to_df()
-    print(training_df.head())
+    )
+    return training_df
 
 
 # def fetch_online_features(store, source: str = ""):

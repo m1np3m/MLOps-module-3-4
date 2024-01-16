@@ -25,7 +25,7 @@ driver = Entity(name="driver", join_keys=["driver_id"])
 # for more info.
 driver_stats_source = FileSource(
     name="driver_hourly_stats_source",
-    path="/home/manpm/Developers/MLOps-module-3-4/movie-recommendation-system/feast/feature_repo/data/driver_stats.parquet",
+    path="./data/driver_stats.parquet",
     timestamp_field="event_timestamp",
     created_timestamp_column="created",
 )
