@@ -1,8 +1,9 @@
 name: Data processing
 inputs:
-- {name: input_df, type: PKL}
+- {name: training_df, type: PKL}
 outputs:
-- {name: df, type: PKL}
+- {name: train_X, type: PKL}
+- {name: train_Y, type: PKL}
 implementation:
   container:
     image: python:3.10
@@ -10,9 +11,10 @@ implementation:
     - sh
     - -c
     - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
-      'joblib' 'cloudpickle' 'pandas' 'kfp==1.8.22' || PIP_DISABLE_PIP_VERSION_CHECK=1
-      python3 -m pip install --quiet --no-warn-script-location 'joblib' 'cloudpickle'
-      'pandas' 'kfp==1.8.22' --user) && "$0" "$@"
+      'joblib' 'cloudpickle' 'pandas' 'kfp==1.8.22' 'scikit-learn==1.3.2' 'SciPy==1.11.4'
+      'wget==3.2' 'feast' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install
+      --quiet --no-warn-script-location 'joblib' 'cloudpickle' 'pandas' 'kfp==1.8.22'
+      'scikit-learn==1.3.2' 'SciPy==1.11.4' 'wget==3.2' 'feast' --user) && "$0" "$@"
     - sh
     - -ec
     - |
@@ -59,17 +61,20 @@ implementation:
       import base64
       import pickle
 
-      data_processing = pickle.loads(base64.b64decode(b'gASVFwYAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwJLAEsASwhLBEtDQ2RkAWQAbAB9AmQBZABsAX0DZAFkAGwCfQRkAWQAbAN9BXwCoARkAqEBfQZ0BWQDfAabAJ0CgwEBAHwFoAZ8AKEBfQd8B2oHdAhkBGQFjQJ8B2QGPAB8BaAJfAd8AaECAQBkAFMAlChOSwCMC0VOVklST05NRU5UlIwLUnVubmluZyBvbiCUSwGMBGF4aXOUhZSMBnN0cmluZ5R0lCiMAm9zlIwDc3lzlIwGcGFuZGFzlIwGam9ibGlilIwGZ2V0ZW52lIwFcHJpbnSUjARsb2FklIwFYXBwbHmUjB1nZW5yZXNfYW5kX2tleXdvcmRzX3RvX3N0cmluZ5SMBGR1bXCUdJQojAhpbnB1dF9kZpSMB2RmX3BhdGiUaA9oEIwCcGSUaBJoCYwCZGaUdJSMcC9ob21lL21hbnBtL0RldmVsb3BlcnMvTUxPcHMtbW9kdWxlLTMtNC9tb3ZpZS1yZWNvbW1lbmRhdGlvbi1zeXN0ZW0vLi9jb21wb25lbnRzL2RhdGFfcHJlcHJvY2Vzc2luZy9jb21wb25lbnQucHmUjA9kYXRhX3Byb2Nlc3NpbmeUSwxDEBABCAEIAQoCDgEKAxICEAKUKSl0lFKUfZQojAtfX3BhY2thZ2VfX5ROjAhfX25hbWVfX5SMCF9fbWFpbl9flIwIX19maWxlX1+UaB91Tk5OdJRSlIwcY2xvdWRwaWNrbGUuY2xvdWRwaWNrbGVfZmFzdJSMEl9mdW5jdGlvbl9zZXRzdGF0ZZSTlGgqfZR9lChoJmggjAxfX3F1YWxuYW1lX1+UaCCMD19fYW5ub3RhdGlvbnNfX5R9lChoGowZa2ZwLmNvbXBvbmVudHMuX3B5dGhvbl9vcJSMCUlucHV0UGF0aJSTlCmBlH2UjAR0eXBllIwDUEtMlHNiaBtoM4wKT3V0cHV0UGF0aJSTlCmBlH2UaDhoOXNidYwOX19rd2RlZmF1bHRzX1+UTowMX19kZWZhdWx0c19flE6MCl9fbW9kdWxlX1+UaCeMB19fZG9jX1+UTowLX19jbG9zdXJlX1+UTowXX2Nsb3VkcGlja2xlX3N1Ym1vZHVsZXOUXZSMC19fZ2xvYmFsc19flH2UaBdoAihoByhLAUsASwBLA0sES0NDUHQAoAF8AGQBGQChAX0BZAKgAmQDZASEAHwBRACDAaEBfQF0AKABfABkBRkAoQF9AmQCoAJkBmQEhAB8AkQAgwGhAX0CZAd8AXwCZgIWAFMAlChOjAZnZW5yZXOUjAEglGgHKEsBSwBLAEsCSwVLc0MigQB8AF0MfQFkAKAAfAFkARkAoAGhAKEBVgABAHECZAJTAJSMAJSMBG5hbWWUToeUjARqb2lulIwFc3BsaXSUhpSMAi4wlIwBapSGlIxZL2hvbWUvbWFucG0vRGV2ZWxvcGVycy9NTE9wcy1tb2R1bGUtMy00L21vdmllLXJlY29tbWVuZGF0aW9uLXN5c3RlbS8uL3V0aWxzL2RhdGFfdXRpbHMucHmUjAk8Z2VuZXhwcj6USwVDBAKAIACUKSl0lFKUjDBnZW5yZXNfYW5kX2tleXdvcmRzX3RvX3N0cmluZy48bG9jYWxzPi48Z2VuZXhwcj6UjAhrZXl3b3Jkc5RoByhLAUsASwBLAksFS3NoSmhNaFBoU2hUaFVLCGhWKSl0lFKUjAUlcyAlc5R0lIwEanNvbpSMBWxvYWRzlGhOh5SMA3Jvd5RoSGhah5RoVGgXSwNDCg4BFAEOAhQBDAGUKSl0lFKUfZQoaCWMBXV0aWxzlGgmjBB1dGlscy5kYXRhX3V0aWxzlGgoaFR1Tk5OdJRSlGgtaGt9lH2UKGgmaBdoMGgXaDF9lGg+Tmg/TmhAaGloQU5oQk5oQ12UaEV9lGhfaACMCXN1YmltcG9ydJSTlGhfhZRSlHN1hpSGUjBzdYaUhlIwLg=='))
+      data_processing = pickle.loads(base64.b64decode(b'gASVfgQAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwNLAEsASwxLBEtDQ6JkAWQAbAB9A2QBZABsAX0EZAFkAGwCfQVkAWQAbAN9BmQBZAJsBG0FfQcBAHwDoAZkA6EBfQh0B2QEfAibAJ0CgwEBAHwGoAh8AKEBfQBkBX0JfAB8AGoJoAp8CaEBoApkBqEBGQB9CnwKdAt8CoMBGQB9CnwAagxkAGQAhQJ8CWYCGQB9C3wGoA18CnwBoQIBAHwGoA18C3wCoQIBAGQAUwCUKE5LAIwQTGluZWFyUmVncmVzc2lvbpSFlIwLRU5WSVJPTk1FTlSUjAtSdW5uaW5nIG9uIJSMImxhYmVsX2RyaXZlcl9yZXBvcnRlZF9zYXRpc2ZhY3Rpb26UjA9ldmVudF90aW1lc3RhbXCUdJQojAJvc5SMA3N5c5SMBnBhbmRhc5SMBmpvYmxpYpSMFHNrbGVhcm4ubGluZWFyX21vZGVslGgJjAZnZXRlbnaUjAVwcmludJSMBGxvYWSUjAdjb2x1bW5zlIwEZHJvcJSMBnNvcnRlZJSMA2xvY5SMBGR1bXCUdJQojAt0cmFpbmluZ19kZpSMDHRyYWluX1hfcGF0aJSMDHRyYWluX1lfcGF0aJRoEGgRjAJwZJRoE2gJaAuMBnRhcmdldJSMB3RyYWluX1iUjAd0cmFpbl9ZlHSUjHAvaG9tZS9tYW5wbS9EZXZlbG9wZXJzL01MT3BzLW1vZHVsZS0zLTQvbW92aWUtcmVjb21tZW5kYXRpb24tc3lzdGVtLy4vY29tcG9uZW50cy9kYXRhX3ByZXByb2Nlc3NpbmcvY29tcG9uZW50LnB5lIwPZGF0YV9wcm9jZXNzaW5nlEsMQxoQBQgBCAEMAQoCDgEKAwQCFgIMARIBDAIQAZQpKXSUUpR9lCiMC19fcGFja2FnZV9flE6MCF9fbmFtZV9flIwIX19tYWluX1+UjAhfX2ZpbGVfX5RoJnVOTk50lFKUjBxjbG91ZHBpY2tsZS5jbG91ZHBpY2tsZV9mYXN0lIwSX2Z1bmN0aW9uX3NldHN0YXRllJOUaDF9lH2UKGgtaCeMDF9fcXVhbG5hbWVfX5RoJ4wPX19hbm5vdGF0aW9uc19flH2UKGgejBlrZnAuY29tcG9uZW50cy5fcHl0aG9uX29wlIwJSW5wdXRQYXRolJOUKYGUfZSMBHR5cGWUjANQS0yUc2JoH2g6jApPdXRwdXRQYXRolJOUKYGUfZRoP2hAc2JoIGhCKYGUfZRoP2hAc2J1jA5fX2t3ZGVmYXVsdHNfX5ROjAxfX2RlZmF1bHRzX1+UTowKX19tb2R1bGVfX5RoLowHX19kb2NfX5ROjAtfX2Nsb3N1cmVfX5ROjBdfY2xvdWRwaWNrbGVfc3VibW9kdWxlc5RdlIwLX19nbG9iYWxzX1+UfZR1hpSGUjAu'))
 
       import argparse
       _parser = argparse.ArgumentParser(prog='Data processing', description='')
-      _parser.add_argument("--input-df", dest="input_df", type=str, required=True, default=argparse.SUPPRESS)
-      _parser.add_argument("--df", dest="df_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--training-df", dest="training_df", type=str, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--train-X", dest="train_X_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+      _parser.add_argument("--train-Y", dest="train_Y_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
       _parsed_args = vars(_parser.parse_args())
 
       _outputs = data_processing(**_parsed_args)
     args:
-    - --input-df
-    - {inputPath: input_df}
-    - --df
-    - {outputPath: df}
+    - --training-df
+    - {inputPath: training_df}
+    - --train-X
+    - {outputPath: train_X}
+    - --train-Y
+    - {outputPath: train_Y}

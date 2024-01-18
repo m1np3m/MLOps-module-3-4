@@ -6,32 +6,29 @@ import sys, os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 from config.config import *
-from utils.model_utils import Recommender
 
 
 def model_training(
-    df: InputPath("PKL"),
-    matrix_path: OutputPath("PKL"),
-    movie2idx_path: OutputPath("PKL"),
+    train_X: InputPath("PKL"),
+    train_Y: InputPath("PKL"),
 ):
     import os, sys
     import pandas as pd
     import joblib
     from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.linear_model import LinearRegression
 
     ENVIRONMENT = os.getenv("ENVIRONMENT")
     print(f"Running on {ENVIRONMENT}")
     # load data
-    df = joblib.load(df)
+    train_X = joblib.load(train_X)
+    train_Y = joblib.load(train_Y)
 
-    recommender = Recommender(df, 2000)
+    print("\n--- Training model ---")
+    reg = LinearRegression()
+    reg.fit(train_X, train_Y)
 
-    matrix = recommender.init_matrix()
-
-    movie2idx = recommender.map_movie_title_to_idx()
     print("Done training model")
-    joblib.dump(matrix, matrix_path)
-    joblib.dump(movie2idx, movie2idx_path)
 
 
 if __name__ == "__main__":
