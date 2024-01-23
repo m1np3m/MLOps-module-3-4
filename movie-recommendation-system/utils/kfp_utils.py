@@ -112,7 +112,7 @@ class PipelineConfig:
                             name=name,
                             value_from=V1EnvVarSource(
                                 secret_key_ref=V1SecretKeySelector(
-                                    name="jenkins-token", key=value.get("value")
+                                    name="ssh-key", key=value.get("value")
                                 )
                             ),
                         )

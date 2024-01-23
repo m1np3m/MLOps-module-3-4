@@ -1,0 +1,61 @@
+name: Materialize feature store
+implementation:
+  container:
+    image: manpham1999/kubeflow-feast:latest
+    command:
+    - sh
+    - -c
+    - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+      'joblib' 'cloudpickle' 'kfp==1.8.22' 'feast[postgres]' 'feast[redis]' 'GitPython'
+      'psycopg2' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet
+      --no-warn-script-location 'joblib' 'cloudpickle' 'kfp==1.8.22' 'feast[postgres]'
+      'feast[redis]' 'GitPython' 'psycopg2' --user) && "$0" "$@"
+    - sh
+    - -ec
+    - |
+      program_path=$(mktemp)
+      printf "%s" "$0" > "$program_path"
+      python3 -u "$program_path" "$@"
+    - |
+      import sys
+      try:
+          import cloudpickle as _cloudpickle
+      except ImportError:
+          import subprocess
+          try:
+              print("cloudpickle is not installed. Installing it globally", file=sys.stderr)
+              subprocess.run([sys.executable, "-m", "pip", "install", "cloudpickle==1.1.1", "--quiet"], env={"PIP_DISABLE_PIP_VERSION_CHECK": "1"}, check=True)
+              print("Installed cloudpickle globally", file=sys.stderr)
+          except:
+              print("Failed to install cloudpickle globally. Installing for the current user.", file=sys.stderr)
+              subprocess.run([sys.executable, "-m", "pip", "install", "cloudpickle==1.1.1", "--user", "--quiet"], env={"PIP_DISABLE_PIP_VERSION_CHECK": "1"}, check=True)
+              print("Installed cloudpickle for the current user", file=sys.stderr)
+              # Enable loading from user-installed package directory. Python does not add it to sys.path if it was empty at start. Running pip does not refresh `sys.path`.
+              import site
+              sys.path.append(site.getusersitepackages())
+          import cloudpickle as _cloudpickle
+          print("cloudpickle loaded successfully after installing.", file=sys.stderr)
+
+      pickler_python_version = (3, 10, 13, 'final', 0)
+      current_python_version = tuple(sys.version_info)
+      if (
+          current_python_version[0] != pickler_python_version[0] or
+          current_python_version[1] < pickler_python_version[1] or
+          current_python_version[0] == 3 and ((pickler_python_version[1] < 6) != (current_python_version[1] < 6))
+          ):
+          raise RuntimeError("Incompatible python versions: " + str(current_python_version) + " instead of " + str(pickler_python_version))
+
+      if current_python_version != pickler_python_version:
+          print("Warning!: Different python versions. The code may crash! Current environment python version: " + str(current_python_version) + ". Component code python version: " + str(pickler_python_version), file=sys.stderr)
+
+      import base64
+      import pickle
+
+      materialize_feature_store = pickle.loads(base64.b64decode(b'gASV3AoAAAAAAACMF2Nsb3VkcGlja2xlLmNsb3VkcGlja2xllIwOX21ha2VfZnVuY3Rpb26Uk5QoaACMDV9idWlsdGluX3R5cGWUk5SMCENvZGVUeXBllIWUUpQoSwBLAEsASx5LCktDQqwCAABkAWQAbAB9AGQBZABsAX0BZAFkAGwCfQJkAWQAbAN9A2QBZABsBH0EZAFkAmwFbQZ9BQEAZAFkAGwEfQRkAWQDbAdtB30GAQBkAWQAbAh9B2QBZARsCW0KfQgBAGQBZAVsA20LfQltDH0KAQBkAWQGbA1tDn0LAQBkAWQHbA9tEH0MAQBkAWQIbBFtEn0NAQBkCX0OfAh8DoMBahNkCmQKZAuNAgEAdBRkDIMBAQB0FXwOmwBkDZ0CZA6DAn0PfA+gFmQPoQEBAHwPoBehAAEAfASgGGQQZBFkEmQTZBR8DpsAZBWdAmcGoQEBAHwAoBlkFqEBfRB0FXwOmwBkF50CZA6DAn0RfBGgFnwQmwChAQEAfBGgF6EAAQB8BKAYZBhkGXwOmwBkF50CZwOhAQEAfACgGWQaoQF9EnQVfA6bAGQbnQJkDoMCfRN8E6AWfBKbAKEBAQB8E6AXoQABAGQcfRRkHX0VZB59FnqBfAagGqEAfRd8F6AbfBahAX0XfAWgHHwUfBWhAn0YdBRkH3wYmwBkIJ0DgwEBAHQUZCGDAQEAfASgGGQioQEBAHwAoB18FWQjFwChAQEAfASgGGQioQEBAHwEoBhkJKEBAQB8BKAYZCVkJnwXZwOhAQEAfBhqHqAfZAChAX0ZZwB9GnwZRABdDX0bfBqgIHwbaiGhAQEAdBR8G2ohgwEBAHH5dBRkJ4MBAQB8GGoeoCJ8GqEBAQB8BKAYZChkKWcCoQEBAHQUZCqDAQEAfBhqHqAjZCuhAQEAfBhqJGQsZC2NAX0cdBRkLoMBAQB8HKAlZC+hAQEAdBRkMIMBAQBXAG4XBAB0JpABeU0BAH0dAQB6CnQUfB2DAQEAVwBZAGQAfR1+HW4FZAB9HX4ddwF3AAkAfAegJ2QxoQEBAJABcU+UKE5LAIwEUmVwb5SFlIwIZGF0ZXRpbWWUhZSMBFBhdGiUhZSMClJlcG9Db25maWeUjAxGZWF0dXJlU3RvcmWUhpSMFlBvc3RncmVzUmVnaXN0cnlDb25maWeUhZSMHFBvc3RncmVTUUxPZmZsaW5lU3RvcmVDb25maWeUhZSMFlJlZGlzT25saW5lU3RvcmVDb25maWeUhZSMCy9yb290Ly5zc2gvlIiMB3BhcmVudHOUjAhleGlzdF9va5SGlIwiCi0tLSBTZXQgdXAgc3NoIGtleXMgYW5kIGhvc3RzIC0tLZSMBmNvbmZpZ5SMAXeUjDhIb3N0IGdpdGh1Yi5jb20KICAgICAgICAgICAgICAgIFN0cmljdEhvc3RLZXlDaGVja2luZyBub5SMC3NzaC1rZXlzY2FulIwCLXSUjANyc2GUjApnaXRodWIuY29tlIwCPj6UjAtrbm93bl9ob3N0c5SMD1NTSF9QUklWQVRFX0tFWZSMBmlkX3JzYZSMBWNobW9klIwDNDAwlIwOU1NIX1BVQkxJQ19LRVmUjAppZF9yc2EucHVilIwqZ2l0QGdpdGh1Yi5jb206bTFucDNtL01MT3BzLW1vZHVsZS0zLTQuZ2l0lIwOZmVhdHVyZV9zdG9yZS+UjBElWS0lbS0lZFQlSDolTTolU5SMDQotLS0gQ2xvbmluZyCUjAMtLS2UjCEKLS0tIE1hdGVyaWFsaXplIGZlYXR1cmUgc3RvcmUtLS2UjANwd2SUjC5tb3ZpZS1yZWNvbW1lbmRhdGlvbi1zeXN0ZW0vZmVhc3QvZmVhdHVyZV9yZXBvlIwCbHOUjAVmZWFzdJSMF21hdGVyaWFsaXplLWluY3JlbWVudGFslIwdCi0tLSBBZGRpbmcgY2hhbmdlcyB0byBnaXQtLS2UjANnaXSUjAZzdGF0dXOUjB0KLS0tIENvbW1pdCBjaGFuZ2VzIHRvIGdpdC0tLZSMHFVwZGF0ZSByZWdpc3RyeS5kYiBieSBweXRob26UjAZvcmlnaW6UjARuYW1llIWUjB0KLS0tIFB1c2luZyBjaGFuZ2VzIHRvIGdpdC0tLZSMBG1haW6UjAREb25llEsBdJQojAJvc5SMA3N5c5SMBmpvYmxpYpRoNYwKc3VicHJvY2Vzc5RoOGgJaAuMBHRpbWWUjAdwYXRobGlilGgNaA9oEIw9ZmVhc3QuaW5mcmEucmVnaXN0cnkuY29udHJpYi5wb3N0Z3Jlcy5wb3N0Z3Jlc19yZWdpc3RyeV9zdG9yZZRoEoxCZmVhc3QuaW5mcmEub2ZmbGluZV9zdG9yZXMuY29udHJpYi5wb3N0Z3Jlc19vZmZsaW5lX3N0b3JlLnBvc3RncmVzlGgUjB9mZWFzdC5pbmZyYS5vbmxpbmVfc3RvcmVzLnJlZGlzlGgWjAVta2RpcpSMBXByaW50lIwEb3BlbpSMBXdyaXRllIwFY2xvc2WUjANydW6UjAZnZXRlbnaUjANub3eUjAhzdHJmdGltZZSMCmNsb25lX2Zyb22UjAVjaGRpcpSMBWluZGV4lIwEZGlmZpSMBmFwcGVuZJSMBmFfcGF0aJSMA2FkZJSMBmNvbW1pdJSMBnJlbW90ZZSMBHB1c2iUjAlFeGNlcHRpb26UjAVzbGVlcJR0lChoQ2hEaEVoNWhGaAloC2hHaA1oD2gQaBJoFGgWjAhzc2hfcGF0aJSMC2NvbmZpZ19maWxllGgmjAxwcml2YXRlX2ZpbGWUaCqMC3B1YmxpY19maWxllIwIcmVwb191cmyUjApsb2NhbF9wYXRolIwNRk9STUFUX1NUUklOR5RoU4wEcmVwb5SMBWRpZmZzlIwFZmlsZXOUjAFklGg8jAFllHSUjG4vaG9tZS9tYW5wbS9EZXZlbG9wZXJzL01MT3BzLW1vZHVsZS0zLTQvbW92aWUtcmVjb21tZW5kYXRpb24tc3lzdGVtLy4vY29tcG9uZW50cy9tYXRlcmlhbGl6aW5nX2ZzL2NvbXBvbmVudC5weZSMGW1hdGVyaWFsaXplX2ZlYXR1cmVfc3RvcmWUSwxDiBABCAEIAQgBDAEIAQwBCAEMARABDAEMAwwDBAISAQgCEAEEAQIBBP8IBAQCFAEE/woEEAEMAQgBFgIKAhABDAEIAQQCBAEEAQICCAEKAQwCEAEIAwoBDgEKAQoBEAIMAgQBCAEMAQwBCAMMAQ4BCAQMAQwCCAIKAgwCEAEUAQiAAv8CAwoBBP+UKSl0lFKUfZQojAtfX3BhY2thZ2VfX5ROjAhfX25hbWVfX5SMCF9fbWFpbl9flIwIX19maWxlX1+UaG91Tk5OdJRSlIwcY2xvdWRwaWNrbGUuY2xvdWRwaWNrbGVfZmFzdJSMEl9mdW5jdGlvbl9zZXRzdGF0ZZSTlGh6fZR9lChodmhwjAxfX3F1YWxuYW1lX1+UaHCMD19fYW5ub3RhdGlvbnNfX5R9lIwOX19rd2RlZmF1bHRzX1+UTowMX19kZWZhdWx0c19flE6MCl9fbW9kdWxlX1+UaHeMB19fZG9jX1+UTowLX19jbG9zdXJlX1+UTowXX2Nsb3VkcGlja2xlX3N1Ym1vZHVsZXOUXZSMC19fZ2xvYmFsc19flH2UdYaUhlIwLg=='))
+
+      import argparse
+      _parser = argparse.ArgumentParser(prog='Materialize feature store', description='')
+      _parsed_args = vars(_parser.parse_args())
+
+      _outputs = materialize_feature_store(**_parsed_args)
+    args: []

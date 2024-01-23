@@ -17,30 +17,23 @@ data_preprocessing_op = load_component_from_file(
 model_training_op = load_component_from_file(
     f"{COMPONENTS_DIR}/model_training/component.yaml"
 )
-feature_store_op = load_component_from_file(
-    f"{COMPONENTS_DIR}/feature_store/component.yaml"
+materializing_fs_op = load_component_from_file(
+    f"{COMPONENTS_DIR}/materializing_fs/component.yaml"
 )
-
-vop = dsl.VolumeOp(name="creds_volume", resource_name="mypvc", size="1Gi")
 
 
 # Define a pipeline and create a task from above components:
 @dsl.pipeline(name=PIPELINE_NAME, description=PIPELINE_DESCRIPTION)
 def pipeline(url: str):
-    data_downloading_task = data_downloading_op()
-    data_preprocessing_task = data_preprocessing_op(
-        training_df=data_downloading_task.outputs["training_df"]
-    )
-    model_training_task = model_training_op(
-        data_preprocessing_task.outputs["train_X"],
-        data_preprocessing_task.outputs["train_Y"],
-    )
-    # model_evalution_task = model_evaluation_op(
-    #     df=data_preprocessing_task.outputs["df"],
-    #     matrix=model_training_task.outputs["matrix"],
-    #     movie2idx=model_training_task.outputs["movie2idx"],
+    materializing_fs_task = materializing_fs_op()
+    # data_downloading_task = data_downloading_op()
+    # data_preprocessing_task = data_preprocessing_op(
+    #     training_df=data_downloading_task.outputs["training_df"]
     # )
-    # feature_store_task = feature_store_op(url=url)
+    # model_training_task = model_training_op(
+    #     data_preprocessing_task.outputs["train_X"],
+    #     data_preprocessing_task.outputs["train_Y"],
+    # )
 
 
 if __name__ == "__main__":
@@ -64,6 +57,14 @@ if __name__ == "__main__":
     pipeline_conf = kfp.dsl.PipelineConf()
     # each stage in pipeline will have env variable
     env = {
+        "SSH_PRIVATE_KEY": {
+            "type": "secret",
+            "value": "ssh-privatekey",
+        },
+        "SSH_PUBLIC_KEY": {
+            "type": "secret",
+            "value": "ssh-publickey",
+        },
         "ENVIRONMENT": {
             "type": "string",
             "value": "production" if not args.dev else "staging",
