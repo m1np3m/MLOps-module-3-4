@@ -21,12 +21,12 @@ def data_downloading(training_df_path: OutputPath("PKL")):
     from sklearn.linear_model import LinearRegression
 
     # Download the feast repo
-    # repo_url = "git@github.com:m1np3m/MLOps-module-3-4.git"
-    # work_dir = "./MLOps-module-3-4"
-    # git = Git()
-    # git.clone(repo_url, work_dir)
-    # os.chdir(work_dir + "/movie-recommendation-system/feast/feature_repo")
-    # print(f"Current working directory: {os.listdir(os.getcwd())}")
+    repo_url = "git@github.com:m1np3m/MLOps-module-3-4.git"
+    work_dir = "./MLOps-module-3-4"
+    git = Git()
+    git.clone(repo_url, work_dir)
+    os.chdir(work_dir + "/movie-recommendation-system/feast/feature_repo")
+    print(f"Current working directory: {os.listdir(os.getcwd())}")
     feature_store = FEAST()
     # Fetch historical data for training
     try:
@@ -35,8 +35,8 @@ def data_downloading(training_df_path: OutputPath("PKL")):
         ).to_df()
         print(f"columns: {training_df.columns}")
         print("training_df: ", training_df.head())
-        while True:
-            time.sleep(1)
+        # while True:
+        #     time.sleep(1)
         joblib.dump(training_df, training_df_path)
     except Exception as e:
         print(f"Error While convert historical data to df: {e}")

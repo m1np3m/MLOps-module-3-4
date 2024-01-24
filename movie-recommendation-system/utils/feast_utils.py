@@ -10,30 +10,6 @@ from feast import FeatureStore
 class FEAST:
     def __init__(self) -> None:
         # Initiate Feast Store
-        data_path = "./data"
-
-        # Download the feast repo
-        registry_db_url = "https://github.com/m1np3m/MLOps-module-3-4/raw/main/movie-recommendation-system/feast/feature_repo/data/registry.db"
-        driver_stats_parquet_url = "https://github.com/m1np3m/MLOps-module-3-4/raw/main/movie-recommendation-system/feast/feature_repo/data/driver_stats.parquet"
-        feature_store_url = "https://raw.githubusercontent.com/m1np3m/MLOps-module-3-4/main/movie-recommendation-system/feast/feature_repo/feature_store.yaml"
-        online_db_url = "https://github.com/m1np3m/MLOps-module-3-4/raw/main/movie-recommendation-system/feast/feature_repo/data/online_store.db"
-        test_fill_flow_url = "https://raw.githubusercontent.com/m1np3m/MLOps-module-3-4/main/movie-recommendation-system/feast/feature_repo/test_workflow.py"
-        Path("./data").mkdir(parents=True, exist_ok=True)
-        registry_db = wget.download(registry_db_url, out=data_path)
-        print(f"registry_db existed: { os.path.exists(registry_db)}")
-        driver_stats_parquet = wget.download(driver_stats_parquet_url, out=data_path)
-        print(f"driver_stats_parquet existed: { os.path.exists(driver_stats_parquet)}")
-        feature_store_parquet = wget.download(feature_store_url)
-        print(f"feature_store.yaml existed: { os.path.exists(feature_store_parquet)}")
-        online_db = wget.download(online_db_url, out=data_path)
-        print(f"online.db existed: { os.path.exists(online_db)}")
-        example_feature_repo = wget.download(
-            "https://raw.githubusercontent.com/m1np3m/MLOps-module-3-4/main/movie-recommendation-system/feast/feature_repo/example_repo.py"
-        )
-        print(f"example_feature_repo existed: {os.path.exists(example_feature_repo)}")
-        test_fill_flow_py = wget.download(test_fill_flow_url)
-        print(f"test_fill_flow.py existed: {os.path.exists(test_fill_flow_py)}")
-
         self.store = FeatureStore(repo_path=".")
         pass
 

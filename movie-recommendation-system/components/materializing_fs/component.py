@@ -35,30 +35,33 @@ def materialize_feature_store():
             sys.exit(1)
 
         # Materialize feature store
-        print(f"\n--- Materialize feature store---")
+        print(f"\n--- Materializing feature store---")
         os.chdir(local_path + "movie-recommendation-system/feast/feature_repo")
-        subprocess.run("ls")
-
+        # Replace subprocess by sdk
+        # repo_config = RepoConfig(
+        #     registry=RegistryConfig(path="s3://[YOUR BUCKET]/registry.pb"),
+        #     project="feast_demo_aws",
+        #     provider="aws",
+        #     offline_store="file",
+        #     online_store=DynamoDBOnlineStoreConfig(region="us-west-2")
+        # )
+        # store = FeatureStore(config=repo_config)
+        # store.materialize_incremental(datetime.datetime.now())
         subprocess.run(["feast", "materialize-incremental", now])
         # Diffs
-
         diffs = git.diff()
-        files = []
-        for d in diffs:
-            files.append(d.a_path)
-            print(d.a_path)
+        print(f"Changes files: {diffs}")
 
         # Git add
         print(f"\n--- Adding changes to git---")
-        git.add_changes(files)
+        git.add_changes(diffs)
         subprocess.run(["git", "status"])
-
         # Git commit
         # $ git commit -m <message>
         print(f"\n--- Commit changes to git---")
         git.commit("Update registry.db by python")
         print(f"\n--- Pusing changes to git---")
-        subprocess.run(["git", "push", "origin", "main"])
+        git.push("main")
         print("Done")
     except Exception as e:
         print(e)

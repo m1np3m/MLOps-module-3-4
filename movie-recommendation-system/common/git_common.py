@@ -45,7 +45,7 @@ class Git:
         return os.path.exists(self.repo.git_dir)
 
     def diff(self) -> list[str]:
-        diffs = self.repo.index.diff()
+        diffs = self.repo.index.diff(None)
         files = []
         for d in diffs:
             files.append(d.a_path)
@@ -56,7 +56,6 @@ class Git:
         files: from diff()
         """
         # Git add
-        print(f"\n--- Adding changes to git---")
         self.repo.index.add(files)
 
     def commit(self, message):
