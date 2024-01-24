@@ -5,21 +5,11 @@ from pathlib import Path
 import wget
 import pandas as pd
 from feast import FeatureStore
-from feast.data_source import PushMode
-
-# from feast.data_source import BigQuerySource, DataSource, FileSource
-# from feast.errors import FeastOfflineStoreUnsupportedDataSource
-from feast.infra.offline_stores.offline_store import OfflineStore
-
-# from feast.repo_config import (
-#     BigQueryOfflineStoreConfig,
-#     FileOfflineStoreConfig,
-#     OfflineStoreConfig,
-# )
 
 
 class FEAST:
     def __init__(self) -> None:
+        # Initiate Feast Store
         data_path = "./data"
 
         # Download the feast repo
@@ -44,7 +34,6 @@ class FEAST:
         test_fill_flow_py = wget.download(test_fill_flow_url)
         print(f"test_fill_flow.py existed: {os.path.exists(test_fill_flow_py)}")
 
-        # Initiate Feast Store
         self.store = FeatureStore(repo_path=".")
         pass
 

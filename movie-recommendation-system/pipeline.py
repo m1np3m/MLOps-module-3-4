@@ -25,15 +25,15 @@ materializing_fs_op = load_component_from_file(
 # Define a pipeline and create a task from above components:
 @dsl.pipeline(name=PIPELINE_NAME, description=PIPELINE_DESCRIPTION)
 def pipeline(url: str):
-    materializing_fs_task = materializing_fs_op()
-    # data_downloading_task = data_downloading_op()
-    # data_preprocessing_task = data_preprocessing_op(
-    #     training_df=data_downloading_task.outputs["training_df"]
-    # )
-    # model_training_task = model_training_op(
-    #     data_preprocessing_task.outputs["train_X"],
-    #     data_preprocessing_task.outputs["train_Y"],
-    # )
+    data_downloading_task = data_downloading_op()
+    data_preprocessing_task = data_preprocessing_op(
+        training_df=data_downloading_task.outputs["training_df"]
+    )
+    model_training_task = model_training_op(
+        data_preprocessing_task.outputs["train_X"],
+        data_preprocessing_task.outputs["train_Y"],
+    )
+    materializing_fs_task = materializing_fs_op().after(model_training_task)
 
 
 if __name__ == "__main__":
